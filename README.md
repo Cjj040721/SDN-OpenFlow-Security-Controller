@@ -1,8 +1,27 @@
+<div align="center">
+
 # SDN OpenFlow Security Controller
 
-An educational software-defined networking project using Ryu, OpenFlow 1.3, Mininet, and Open vSwitch. One controller combines L4-aware learning switches, JSON-driven firewall rules, periodic flow statistics, and SYN-flood mitigation.
+**Learning switches, firewall rules, flow statistics, and SYN-flood defence in one Ryu controller.**
 
-## Network Topology
+An educational SDN project using Ryu, OpenFlow 1.3, Mininet, and Open vSwitch, with a three-switch topology and JSON-driven security rules.
+
+[![Python](https://img.shields.io/badge/Python-3.9-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Ryu](https://img.shields.io/badge/Ryu-SDN_Controller-2AA887)](https://ryu.readthedocs.io/)
+[![OpenFlow](https://img.shields.io/badge/OpenFlow-1.3-0072B2)](#topology)
+[![Mininet](https://img.shields.io/badge/Mininet-Integration_Recorded-6E56CF)](#verification)
+[![Static Checks](https://img.shields.io/badge/Static_Checks-Passed-2AA887)](#verification)
+
+[Topology](#topology) · [Features](#features) · [Quick Start](#quick-start) · [Verification](#verification) · [Limitations](#limitations)
+
+**[Firewall rules](rules.json) · [Verification record](docs/verification.md)**
+
+</div>
+
+---
+
+<a id="topology"></a>
+## 1. Network Topology
 
 ```text
 h1 ─┐
@@ -11,24 +30,26 @@ h3 ─┘                  ├─ h5
                        └─ h6
 ```
 
-| Component | DPID | Behavior |
+| Component | DPID | Role |
 | --- | --- | --- |
 | `s1` | `0000000000000001` | L4-aware learning switch |
 | `s2` | `0000000000000002` | Firewall, monitoring, and SYN-flood defence |
 | `s3` | `0000000000000003` | L4-aware learning switch |
 
-Hosts `h1`–`h6` use `10.0.0.1/24`–`10.0.0.6/24`.
+Hosts `h1`–`h6` use `10.0.0.1/24`–`10.0.0.6/24`. The controller handles table-miss entries, packet-in events, flow installation, and periodic statistics requests.
 
-## Features
+<a id="features"></a>
+## 2. Features
 
-- **L4 learning:** installs flows using Ethernet, IPv4, and transport-layer fields where available.
-- **Firewall:** loads deny rules from `rules.json` and installs them on `s2`.
-- **Monitoring:** requests flow statistics every five seconds and logs packet/byte counters.
-- **SYN-flood defence:** more than 20 SYN packets from one source within 10 seconds installs a 60-second temporary drop rule.
-- **Table-miss handling:** unmatched packets are sent to the controller.
-- **State cleanup:** expired SYN timestamps and ban records are removed in the background.
+| Capability | Implementation |
+| --- | --- |
+| **L4 learning** | Matches Ethernet, IPv4, and available TCP/UDP/ICMP fields when installing flows |
+| **Firewall** | Loads deny rules from `rules.json` and installs them on `s2` |
+| **Monitoring** | Requests flow statistics every five seconds and logs packet/byte counters |
+| **SYN-flood defence** | More than 20 SYN packets from one source within 10 seconds installs a 60-second drop rule |
+| **State cleanup** | Removes expired SYN timestamps and ban records in the background |
 
-## Firewall Rules
+### Firewall Rules
 
 | Match | Action |
 | --- | --- |
@@ -37,33 +58,36 @@ Hosts `h1`–`h6` use `10.0.0.1/24`–`10.0.0.6/24`.
 | ICMP echo requests from `10.0.0.4` | Drop |
 | All IPv4 traffic to `10.0.0.3` | Drop |
 
-The ICMP rule matches only echo requests (`icmpv4_type=8`, `icmpv4_code=0`) rather than all ICMP traffic.
+The ICMP rule matches only echo requests (`icmpv4_type=8`, `icmpv4_code=0`) rather than blocking every ICMP packet.
 
-## Requirements
+<a id="quick-start"></a>
+## 3. Quick Start
+
+### Requirements
 
 - Linux or a Linux VM with Mininet and Open vSwitch
 - Python 3.9 recommended for the original Ryu environment
 - Ryu 4.x
 
-Install Python dependencies:
+Install the Python dependency:
 
 ```bash
+git clone https://github.com/Cjj040721/SDN-OpenFlow-Security-Controller.git
+cd SDN-OpenFlow-Security-Controller
 python3.9 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Mininet and Open vSwitch should be installed through the operating system. On Debian/Ubuntu, the relevant packages are `mininet` and `openvswitch-switch`.
+Install Mininet and Open vSwitch through the operating system. On Debian/Ubuntu, the relevant packages are `mininet` and `openvswitch-switch`.
 
-## Run
-
-Start the Ryu controller from the repository root:
+### Start the Controller
 
 ```bash
 ryu-manager controller.py
 ```
 
-In another terminal with Mininet available:
+In another terminal:
 
 ```bash
 sudo mn -c
@@ -74,28 +98,59 @@ sudo mn \
   --switch ovsk,protocols=OpenFlow13
 ```
 
-The controller loads `rules.json` relative to `controller.py`, so no course-specific absolute paths are required.
+The controller loads `rules.json` relative to `controller.py`; no course-specific absolute paths are required.
 
-## Static Checks
+### Static Checks
 
 ```bash
 python -m py_compile controller.py topo.py
 python -m json.tool rules.json > /dev/null
 ```
 
-## Verification
+<a id="verification"></a>
+## 4. Verification
 
-The original Linux run covered topology creation, L4 learning, firewall counters, flow statistics, and temporary SYN-flood blocking. The cleaned repository also passes syntax and configuration checks.
+| Check | Evidence |
+| --- | --- |
+| Python syntax | `controller.py` and `topo.py` compile successfully |
+| Firewall configuration | Valid JSON with exactly four rules on datapath `0000000000000002` |
+| Topology | DPIDs `1`, `2`, and `3`, with six expected host addresses |
+| SYN parameters | Threshold `20`, window `10` seconds, ban duration `60` seconds |
+| Original Linux integration | Topology, L4 learning, firewall counters, flow statistics, and temporary SYN blocking recorded |
+| Current dynamic rerun | **Not performed**; Ryu and Mininet are unavailable in the current macOS environment |
 
-See [`docs/verification.md`](docs/verification.md) for the recorded evidence and the checks that could not be rerun in the current macOS environment.
+The original integration run used a Python 3.9 Ryu environment. Its verbose logs and course-specific paths are not redistributed; the evidence is summarised in [`docs/verification.md`](docs/verification.md).
 
-## Scope and Limitations
+## 5. Repository Structure
+
+```text
+SDN-OpenFlow-Security-Controller/
+├── controller.py          # Learning, firewall, statistics, and SYN defence
+├── topo.py                # Three-switch, six-host Mininet topology
+├── rules.json             # Datapath-specific firewall rules
+├── docs/verification.md   # Original integration evidence and current checks
+├── requirements.txt       # Ryu dependency
+└── LICENSE
+```
+
+<a id="limitations"></a>
+## 6. Limitations
 
 - Designed for a local Mininet teaching environment, not production deployment.
-- Uses fixed switch DPIDs and a single controller without high availability.
+- Uses fixed switch DPIDs and one controller without high availability.
 - Does not provide controller authentication, TLS, or persistent network state.
-- SYN detection is threshold-based and can require tuning for different traffic patterns.
+- SYN detection is threshold-based and should be tuned for the target traffic pattern.
 
-## License
+## 7. Licence
 
-Permission for public redistribution has been confirmed. Original project code and documentation are released under the [MIT License](LICENSE). Ryu, Mininet, Open vSwitch, and other dependencies retain their own licenses.
+Original project code and documentation are available under the [MIT License](LICENSE). Ryu, Mininet, Open vSwitch, and other dependencies retain their original licences.
+
+---
+
+<div align="center">
+
+**SDN OpenFlow Security Controller — Learn the route. Enforce the rule. Watch the traffic.**
+
+Ryu + OpenFlow 1.3 + Mininet + Open vSwitch
+
+</div>
