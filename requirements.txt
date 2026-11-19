@@ -1,0 +1,2 @@
+# Ryu controller dependencies. Install Mininet and Open vSwitch through the OS.
+ryu>=4.0,<5
